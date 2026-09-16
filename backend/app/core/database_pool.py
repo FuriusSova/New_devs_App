@@ -15,15 +15,18 @@ class DatabasePool:
         """Initialize database connection pool"""
         try:
             # Create async engine with connection pooling
-            database_url = f"postgresql+asyncpg://{settings.supabase_db_user}:{settings.supabase_db_password}@{settings.supabase_db_host}:{settings.supabase_db_port}/{settings.supabase_db_name}"
+            database_url = settings.database_url.replace(
+                "postgresql://",
+                "postgresql+asyncpg://",
+                1,
+            )
             
             self.engine = create_async_engine(
                 database_url,
-                poolclass=QueuePool,
-                pool_size=20,  # Number of connections to maintain
-                max_overflow=30,  # Additional connections when needed
+                pool_size=settings.database_pool_size,
+                max_overflow=settings.database_max_overflow,
                 pool_pre_ping=True,  # Validate connections
-                pool_recycle=3600,  # Recycle connections every hour
+                pool_recycle=settings.database_pool_recycle,  # Recycle connections every hour
                 echo=False  # Set to True for SQL debugging
             )
             
@@ -45,10 +48,9 @@ class DatabasePool:
         if self.engine:
             await self.engine.dispose()
     
-    async def get_session(self) -> AsyncSession:
-        """Get database session from pool"""
-        if not self.session_factory:
-            raise Exception("Database pool not initialized")
+    def get_session(self) -> AsyncSession:
+        if self.session_factory is None:
+            raise RuntimeError("Database pool is not initialized")
         return self.session_factory()
 
 # Global database pool instance

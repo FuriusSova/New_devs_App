@@ -32,6 +32,7 @@ from .api.v1 import (
 )
 
 from .monitoring.middleware import PerformanceMonitoringMiddleware
+from .core.database_pool import db_pool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -89,6 +90,11 @@ async def cache_invalidation_listener():
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up...")
+
+    # Initialize database pool
+    await db_pool.initialize()
+    if db_pool.session_factory is None:
+        raise RuntimeError("Database pool failed to initialize")
 
     # Initialize Supabase connection pool
     try:
