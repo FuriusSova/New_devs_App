@@ -4,6 +4,7 @@ from typing import Any, Dict
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
+from fastapi import HTTPException
 
 
 async def calculate_monthly_revenue(
@@ -121,3 +122,33 @@ async def calculate_total_revenue(property_id: str, tenant_id: str) -> Dict[str,
             "currency": "USD",
             "count": mock_property_data['count']
         }
+
+
+async def ensure_property_belongs_to_tenant(
+    property_id: str,
+    tenant_id: str,
+) -> None:
+    from app.core.database_pool import db_pool
+
+    if db_pool.session_factory is None:
+        await db_pool.initialize()
+
+    async with db_pool.get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT id
+                FROM properties
+                WHERE id = :property_id
+                  AND tenant_id = :tenant_id
+            """),
+            {
+                "property_id": property_id,
+                "tenant_id": tenant_id,
+            },
+        )
+
+        if result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Property not found for this tenant",
+            )
